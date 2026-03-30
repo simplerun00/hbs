@@ -1,0 +1,19 @@
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large desktop distribution files
+공유 프로그램/*.zip
+extracted/**/*.exe
+
+# Optional local exports
+*.log
+*.tmp
