@@ -1,5 +1,4 @@
 ﻿const pdfInput = document.getElementById("pdf-file");
-const apiBaseInput = document.getElementById("api-base-url");
 const rangeInput = document.getElementById("page-range");
 const qualityInput = document.getElementById("jpg-quality");
 const renderButton = document.getElementById("render-button");
@@ -8,8 +7,8 @@ const statusEl = document.getElementById("tool-status");
 const previewCountEl = document.getElementById("preview-count");
 const previewGrid = document.getElementById("preview-grid");
 const uploadPanel = document.getElementById("upload-panel");
-
-const API_STORAGE_KEY = "hbs-pdf-api-base-url";
+const selectedFileNameEl = document.getElementById("selected-file-name");
+const qualityValueEl = document.getElementById("jpg-quality-value");
 
 let currentPdfFile = null;
 let isRendering = false;
@@ -19,23 +18,32 @@ function setStatus(message) {
   statusEl.textContent = message;
 }
 
-function getSavedApiBaseUrl() {
-  const saved = window.localStorage.getItem(API_STORAGE_KEY);
-  const configured = window.PDF_TOOL_CONFIG && typeof window.PDF_TOOL_CONFIG.apiBaseUrl === "string"
-    ? window.PDF_TOOL_CONFIG.apiBaseUrl
-    : "";
+function updateQualityLabel() {
+  if (!qualityValueEl) {
+    return;
+  }
 
-  return (saved || configured || "").trim();
+  qualityValueEl.textContent = `${Math.round(Number(qualityInput.value || "0.9") * 100)}%`;
+}
+
+function updateSelectedFileLabel(file) {
+  if (!selectedFileNameEl) {
+    return;
+  }
+
+  selectedFileNameEl.textContent = file ? file.name : "아직 선택되지 않음";
 }
 
 function normalizeApiBaseUrl(value) {
   return (value || "").trim().replace(/\/+$/, "");
 }
 
-function saveApiBaseUrl(value) {
-  const normalized = normalizeApiBaseUrl(value);
-  window.localStorage.setItem(API_STORAGE_KEY, normalized);
-  return normalized;
+function getConfiguredApiBaseUrl() {
+  const configured = window.PDF_TOOL_CONFIG && typeof window.PDF_TOOL_CONFIG.apiBaseUrl === "string"
+    ? window.PDF_TOOL_CONFIG.apiBaseUrl
+    : "";
+
+  return normalizeApiBaseUrl(configured);
 }
 
 function clearResult() {
@@ -94,6 +102,7 @@ function updateSelectedFile(fileList) {
   if (!pdfFile) {
     pdfInput.value = "";
     currentPdfFile = null;
+    updateSelectedFileLabel(null);
     setStatus("PDF 파일만 넣을 수 있습니다.");
     return;
   }
@@ -102,6 +111,7 @@ function updateSelectedFile(fileList) {
   transfer.items.add(pdfFile);
   pdfInput.files = transfer.files;
   currentPdfFile = pdfFile;
+  updateSelectedFileLabel(pdfFile);
   setStatus(`선택된 파일: ${pdfFile.name}`);
 }
 
@@ -116,10 +126,9 @@ async function requestServerConversion() {
     return;
   }
 
-  const apiBaseUrl = saveApiBaseUrl(apiBaseInput.value);
+  const apiBaseUrl = getConfiguredApiBaseUrl();
   if (!apiBaseUrl) {
-    setStatus("백엔드 주소를 먼저 입력해 주세요.");
-    apiBaseInput.focus();
+    setStatus("변환 서버를 준비하는 중입니다. 잠시 후 다시 시도해 주세요.");
     return;
   }
 
@@ -149,7 +158,7 @@ async function requestServerConversion() {
           errorMessage = errorData.detail;
         }
       } catch (error) {
-        // Keep the default message when the server does not return JSON.
+        // Keep default message when the server does not return JSON.
       }
 
       throw new Error(errorMessage);
@@ -184,18 +193,19 @@ downloadAllButton.addEventListener("click", () => {
   }
 });
 
-apiBaseInput.addEventListener("change", () => {
-  apiBaseInput.value = saveApiBaseUrl(apiBaseInput.value);
-});
-
 pdfInput.addEventListener("change", () => {
   if (pdfInput.files && pdfInput.files[0]) {
     updateSelectedFile(pdfInput.files);
   } else {
     clearResult();
     currentPdfFile = null;
+    updateSelectedFileLabel(null);
     setStatus("PDF를 선택하면 서버 변환 준비를 시작합니다.");
   }
+});
+
+qualityInput.addEventListener("input", () => {
+  updateQualityLabel();
 });
 
 if (uploadPanel) {
@@ -218,7 +228,8 @@ if (uploadPanel) {
   });
 }
 
-apiBaseInput.value = getSavedApiBaseUrl();
-setStatus(apiBaseInput.value
+updateSelectedFileLabel(null);
+updateQualityLabel();
+setStatus(getConfiguredApiBaseUrl()
   ? "PDF를 선택하면 서버 변환을 시작할 수 있습니다."
-  : "백엔드 주소를 먼저 입력해 주세요.");
+  : "변환 서버를 준비하는 중입니다. 잠시 후 다시 시도해 주세요.");
