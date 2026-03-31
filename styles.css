@@ -951,6 +951,16 @@ button {
   background: rgba(12, 16, 23, 0.64);
 }
 
+.backend-status {
+  margin-top: 16px;
+  color: var(--muted-strong);
+  font-size: 0.94rem;
+}
+
+.backend-status[data-mode="local"] {
+  color: var(--teal);
+}
+
 .detail-list {
   margin: 12px 0 0;
   padding-left: 18px;
@@ -1283,7 +1293,8 @@ button {
 }
 
 .editor-tool-group,
-.editor-rotate-group {
+.editor-rotate-group,
+.editor-zoom-group {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1319,6 +1330,13 @@ button {
   font-family: "Orbitron", "IBM Plex Sans KR", sans-serif;
 }
 
+.editor-zoom-value {
+  display: inline-flex;
+  align-items: center;
+  color: var(--teal);
+  font-family: "Orbitron", "IBM Plex Sans KR", sans-serif;
+}
+
 .editor-main {
   align-items: start;
   margin-top: 18px;
@@ -1327,7 +1345,9 @@ button {
 .editor-canvas-shell {
   flex: 1;
   min-width: 0;
+  max-height: 70vh;
   padding: 14px;
+  overflow: auto;
   border: 1px solid rgba(121, 135, 170, 0.12);
   background: #11161f;
 }
@@ -1350,6 +1370,10 @@ button {
   position: absolute;
   inset: 0;
   cursor: crosshair;
+}
+
+#editor-overlay.is-pan-mode {
+  cursor: grab;
 }
 
 .editor-side {

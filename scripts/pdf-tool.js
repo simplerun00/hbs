@@ -10,11 +10,13 @@ const previewGrid = document.getElementById("preview-grid");
 const uploadPanel = document.getElementById("upload-panel");
 const selectedFileNameEl = document.getElementById("selected-file-name");
 const qualityValueEl = document.getElementById("jpg-quality-value");
+const backendStatusEl = document.getElementById("backend-status");
 
 const editorModal = document.getElementById("editor-modal");
 const editorCloseButton = document.getElementById("editor-close");
 const editorCanvas = document.getElementById("editor-canvas");
 const editorOverlay = document.getElementById("editor-overlay");
+const editorCanvasShell = document.querySelector(".editor-canvas-shell");
 const editorPageLabel = document.getElementById("editor-page-label");
 const editorFileLabel = document.getElementById("editor-file-label");
 const editorStatus = document.getElementById("editor-status");
@@ -25,6 +27,11 @@ const editorResetButton = document.getElementById("editor-reset");
 const editorApplyButton = document.getElementById("editor-apply");
 const editorRotateLeftButton = document.getElementById("editor-rotate-left");
 const editorRotateRightButton = document.getElementById("editor-rotate-right");
+const editorPanModeButton = document.getElementById("editor-pan-mode");
+const editorZoomInButton = document.getElementById("editor-zoom-in");
+const editorZoomOutButton = document.getElementById("editor-zoom-out");
+const editorZoomFitButton = document.getElementById("editor-zoom-fit");
+const editorZoomValue = document.getElementById("editor-zoom-value");
 const editorSizeInput = document.getElementById("editor-size");
 const editorSizeValue = document.getElementById("editor-size-value");
 const editorToolButtons = Array.from(document.querySelectorAll(".editor-tool-button"));
@@ -32,6 +39,7 @@ const editorToolButtons = Array.from(document.querySelectorAll(".editor-tool-but
 let currentPdfFile = null;
 let isRendering = false;
 let lastResult = null;
+let resolvedApiBaseUrl = "";
 
 let pdfDocument = null;
 let editorPages = [];
@@ -43,6 +51,12 @@ let editorDrawing = false;
 let editorPoints = [];
 let editorRectStart = null;
 let activePointerId = null;
+let editorZoom = 1;
+let editorBaseScale = 1.25;
+let editorPan = false;
+let editorPanPointer = null;
+let editorPanStart = null;
+let editorPanScrollStart = null;
 
 if (window.pdfjsLib) {
   window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
@@ -64,15 +78,76 @@ function updateSelectedFileLabel(file) {
   selectedFileNameEl.textContent = file ? file.name : "아직 선택한 파일이 없습니다.";
 }
 
+function setBackendStatus(message, isLocal = false) {
+  if (!backendStatusEl) {
+    return;
+  }
+  backendStatusEl.textContent = message;
+  backendStatusEl.dataset.mode = isLocal ? "local" : "remote";
+}
+
 function normalizeApiBaseUrl(value) {
   return (value || "").trim().replace(/\/+$/, "");
 }
 
-function getConfiguredApiBaseUrl() {
-  const configured = window.PDF_TOOL_CONFIG && typeof window.PDF_TOOL_CONFIG.apiBaseUrl === "string"
-    ? window.PDF_TOOL_CONFIG.apiBaseUrl
-    : "";
-  return normalizeApiBaseUrl(configured);
+function getCandidateApiBaseUrls() {
+  const config = window.PDF_TOOL_CONFIG || {};
+  const local = normalizeApiBaseUrl(config.localApiBaseUrl);
+  const remote = normalizeApiBaseUrl(config.defaultApiBaseUrl);
+  const preferLocal = Boolean(config.preferLocalhost) && window.location.hostname === "127.0.0.1";
+  return preferLocal ? [local, remote].filter(Boolean) : [remote, local].filter(Boolean);
+}
+
+function getRequestTimeoutMs() {
+  const config = window.PDF_TOOL_CONFIG || {};
+  return Number(config.requestTimeoutMs || 300000);
+}
+
+async function probeApiBaseUrl(baseUrl) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4000);
+
+  try {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: "GET",
+      signal: controller.signal,
+      cache: "no-store"
+    });
+    if (!response.ok) {
+      throw new Error("health check failed");
+    }
+    return true;
+  } catch (error) {
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function resolveApiBaseUrl(force = false) {
+  if (resolvedApiBaseUrl && !force) {
+    return resolvedApiBaseUrl;
+  }
+
+  setBackendStatus("연결할 변환 서버를 확인하는 중입니다.");
+
+  for (const baseUrl of getCandidateApiBaseUrls()) {
+    if (await probeApiBaseUrl(baseUrl)) {
+      resolvedApiBaseUrl = baseUrl;
+      const isLocal = baseUrl.includes("127.0.0.1") || baseUrl.includes("localhost");
+      setBackendStatus(
+        isLocal
+          ? `현재 로컬 변환 서버 사용 중: ${baseUrl}`
+          : `현재 원격 변환 서버 사용 중: ${baseUrl}`,
+        isLocal
+      );
+      return resolvedApiBaseUrl;
+    }
+  }
+
+  resolvedApiBaseUrl = "";
+  setBackendStatus("변환 서버에 연결하지 못했습니다. 로컬 백엔드 또는 Render 서버 상태를 확인해 주세요.");
+  return "";
 }
 
 function parsePageRange(rangeText, totalPages) {
@@ -168,6 +243,8 @@ function resetEditorState() {
   pdfDocument = null;
   editorPages = [];
   currentEditorIndex = 0;
+  editorZoom = 1;
+  editorPan = false;
 }
 
 function updateSelectedFile(fileList) {
@@ -223,10 +300,24 @@ function updateEditorToolButtons() {
   editorToolButtons.forEach((button) => {
     button.classList.toggle("is-active", button.dataset.tool === editorTool);
   });
+  editorPanModeButton?.classList.toggle("is-active", editorPan);
+  editorOverlay.classList.toggle("is-pan-mode", editorPan);
 }
 
 function updateEditorSizeLabel() {
   editorSizeValue.textContent = `${editorSizeInput.value}px`;
+}
+
+function updateEditorZoomLabel() {
+  editorZoomValue.textContent = `${Math.round(editorZoom * 100)}%`;
+}
+
+function setEditorZoom(nextZoom) {
+  editorZoom = Math.min(4, Math.max(0.5, nextZoom));
+  updateEditorZoomLabel();
+  if (pdfDocument && editorPages.length) {
+    renderEditorPage();
+  }
 }
 
 function clearEditorOverlay() {
@@ -287,7 +378,7 @@ async function renderEditorPage() {
   const pageNumber = getCurrentEditorPageNumber();
   const page = await pdfDocument.getPage(pageNumber);
   const rotation = getCurrentRotation();
-  const viewport = page.getViewport({ scale: 1.25, rotation });
+  const viewport = page.getViewport({ scale: editorBaseScale * editorZoom, rotation });
   const context = editorCanvas.getContext("2d", { alpha: false });
 
   editorCanvas.width = viewport.width;
@@ -323,9 +414,13 @@ async function openEditor() {
     pdfDocument = await loadingTask.promise;
     editorPages = parsePageRange(rangeInput.value, pdfDocument.numPages);
     currentEditorIndex = 0;
+    editorZoom = 1;
+    editorPan = false;
 
     editorModal.hidden = false;
     document.body.classList.add("modal-open");
+    updateEditorZoomLabel();
+    updateEditorToolButtons();
     await renderEditorPage();
   } catch (error) {
     setStatus(error.message || "편집기를 열지 못했습니다.");
@@ -435,6 +530,16 @@ editorOverlay.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  if (editorPan) {
+    editorPanPointer = event.pointerId;
+    editorPanStart = { x: event.clientX, y: event.clientY };
+    editorPanScrollStart = {
+      left: editorCanvasShell.scrollLeft,
+      top: editorCanvasShell.scrollTop
+    };
+    return;
+  }
+
   activePointerId = event.pointerId;
   editorDrawing = true;
   const point = getEditorPointerPosition(event);
@@ -449,6 +554,14 @@ editorOverlay.addEventListener("pointerdown", (event) => {
 });
 
 editorOverlay.addEventListener("pointermove", (event) => {
+  if (editorPan && editorPanPointer === event.pointerId && editorPanStart && editorPanScrollStart) {
+    const dx = event.clientX - editorPanStart.x;
+    const dy = event.clientY - editorPanStart.y;
+    editorCanvasShell.scrollLeft = editorPanScrollStart.left - dx;
+    editorCanvasShell.scrollTop = editorPanScrollStart.top - dy;
+    return;
+  }
+
   if (!editorDrawing || activePointerId !== event.pointerId) {
     return;
   }
@@ -463,6 +576,13 @@ editorOverlay.addEventListener("pointermove", (event) => {
 });
 
 editorOverlay.addEventListener("pointerup", async (event) => {
+  if (editorPan && editorPanPointer === event.pointerId) {
+    editorPanPointer = null;
+    editorPanStart = null;
+    editorPanScrollStart = null;
+    return;
+  }
+
   if (!editorDrawing || activePointerId !== event.pointerId) {
     return;
   }
@@ -487,8 +607,21 @@ editorOverlay.addEventListener("pointercancel", () => {
   activePointerId = null;
   editorPoints = [];
   editorRectStart = null;
+  editorPanPointer = null;
+  editorPanStart = null;
+  editorPanScrollStart = null;
   clearEditorOverlay();
 });
+
+editorOverlay.addEventListener("wheel", (event) => {
+  if (editorModal.hidden) {
+    return;
+  }
+
+  event.preventDefault();
+  const delta = event.deltaY < 0 ? 0.1 : -0.1;
+  setEditorZoom(editorZoom + delta);
+}, { passive: false });
 
 async function requestServerConversion() {
   if (isRendering) {
@@ -501,9 +634,9 @@ async function requestServerConversion() {
     return;
   }
 
-  const apiBaseUrl = getConfiguredApiBaseUrl();
+  const apiBaseUrl = await resolveApiBaseUrl();
   if (!apiBaseUrl) {
-    setStatus("변환 서버를 준비하는 중입니다. 잠시 후 다시 시도해 주세요.");
+    setStatus("변환 서버에 연결하지 못했습니다. 로컬 백엔드 또는 Render 서버 상태를 확인해 주세요.");
     return;
   }
 
@@ -521,10 +654,14 @@ async function requestServerConversion() {
     formData.append("edits_json", JSON.stringify(editorEdits));
     formData.append("rotations_json", JSON.stringify(editorRotations));
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), getRequestTimeoutMs());
     const response = await fetch(`${apiBaseUrl}/api/pdf/convert`, {
       method: "POST",
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
+    window.clearTimeout(timeout);
 
     if (!response.ok) {
       let errorMessage = "서버 변환에 실패했습니다.";
@@ -553,7 +690,11 @@ async function requestServerConversion() {
     setStatus(`변환이 완료되었습니다. ${filename} 파일을 내려받았습니다.`);
   } catch (error) {
     clearResult();
-    setStatus(error.message || "서버 변환 중 오류가 발생했습니다.");
+    if (error.name === "AbortError") {
+      setStatus("변환 시간이 길어지고 있습니다. 대용량 PDF이거나 서버 응답이 지연된 상태입니다. 로컬 백엔드를 우선 사용하거나 페이지 범위를 줄여 다시 시도해 주세요.");
+    } else {
+      setStatus(error.message || "서버 변환 중 오류가 발생했습니다.");
+    }
   } finally {
     isRendering = false;
     renderButton.disabled = false;
@@ -621,6 +762,24 @@ editorRotateRightButton.addEventListener("click", async () => {
   await renderEditorPage();
 });
 
+editorPanModeButton.addEventListener("click", () => {
+  editorPan = !editorPan;
+  updateEditorToolButtons();
+  setEditorStatus(editorPan ? "드래그 이동 모드입니다. 화면을 끌어서 위치를 옮길 수 있습니다." : `현재 ${getCurrentEditorPageNumber()}페이지를 편집 중입니다.`);
+});
+
+editorZoomInButton.addEventListener("click", () => {
+  setEditorZoom(editorZoom + 0.25);
+});
+
+editorZoomOutButton.addEventListener("click", () => {
+  setEditorZoom(editorZoom - 0.25);
+});
+
+editorZoomFitButton.addEventListener("click", () => {
+  setEditorZoom(1);
+});
+
 editorToolButtons.forEach((button) => {
   button.addEventListener("click", () => {
     editorTool = button.dataset.tool;
@@ -684,10 +843,12 @@ if (uploadPanel) {
 updateSelectedFileLabel(null);
 updateQualityLabel();
 updateEditorSizeLabel();
+updateEditorZoomLabel();
 updateEditorToolButtons();
 closeEditor();
+resolveApiBaseUrl();
 setStatus(
-  getConfiguredApiBaseUrl()
+  getCandidateApiBaseUrls().length
     ? "PDF를 선택하면 서버 변환을 시작할 수 있습니다."
     : "변환 서버를 준비하는 중입니다. 잠시 후 다시 시도해 주세요."
 );

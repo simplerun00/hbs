@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import zipfile
 from typing import Iterable
 
@@ -80,6 +81,11 @@ def quality_to_matrix(quality: float) -> fitz.Matrix:
     clamped = min(max(quality, 0.5), 1.0)
     scale = 1.4 + ((clamped - 0.5) / 0.5) * 1.2
     return fitz.Matrix(scale, scale)
+
+
+def sanitize_filename(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-._")
+    return cleaned or "converted"
 
 
 def iter_selected_pages(document: fitz.Document, pages: Iterable[int]) -> Iterable[tuple[int, fitz.Page]]:
@@ -184,6 +190,7 @@ async def convert_pdf_to_jpg_zip(
         edits_by_page = parse_json_form(edits_json, "편집")
         rotations_by_page = parse_json_form(rotations_json, "회전")
         filename_root = os.path.splitext(filename)[0] or "converted"
+        safe_filename_root = sanitize_filename(filename_root)
         zip_buffer = io.BytesIO()
 
         with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -197,14 +204,14 @@ async def convert_pdf_to_jpg_zip(
                 page_edits = edits_by_page.get(str(page_number), [])
                 jpg_bytes = apply_page_edits(pixmap, page_edits, jpg_quality)
                 archive.writestr(
-                    f"{filename_root}-page-{page_number:02d}.jpg",
+                    f"{safe_filename_root}-page-{page_number:02d}.jpg",
                     jpg_bytes,
                 )
     finally:
         document.close()
 
     zip_buffer.seek(0)
-    output_name = f"{filename_root}-jpg.zip"
+    output_name = f"{safe_filename_root}-jpg.zip"
 
     return StreamingResponse(
         zip_buffer,
