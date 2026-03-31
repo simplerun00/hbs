@@ -931,6 +931,10 @@ button {
   margin-top: 22px;
 }
 
+.pdf-tool-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .detail-actions .button {
   min-height: 62px;
   font-size: 1.02rem;
@@ -1222,6 +1226,152 @@ button {
   margin-top: 16px;
 }
 
+.modal-open {
+  overflow: hidden;
+}
+
+.editor-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.editor-dialog {
+  width: min(1240px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid rgba(121, 135, 170, 0.16);
+  background: #0d1118;
+}
+
+.editor-toolbar,
+.editor-top-controls,
+.editor-main,
+.editor-page-info,
+.editor-side-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.editor-toolbar,
+.editor-top-controls {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-toolbar {
+  margin-bottom: 18px;
+}
+
+.editor-title {
+  margin: 0;
+  font-size: 1.8rem;
+  line-height: 1.1;
+}
+
+.editor-tool-group,
+.editor-rotate-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.editor-tool-button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(121, 135, 170, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.editor-tool-button.is-active {
+  border-color: rgba(0, 231, 240, 0.28);
+  background: rgba(0, 231, 240, 0.08);
+  color: var(--teal);
+}
+
+.editor-size-control {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.editor-size-control span {
+  font-weight: 700;
+}
+
+.editor-size-control strong {
+  color: var(--teal);
+  font-family: "Orbitron", "IBM Plex Sans KR", sans-serif;
+}
+
+.editor-main {
+  align-items: start;
+  margin-top: 18px;
+}
+
+.editor-canvas-shell {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(121, 135, 170, 0.12);
+  background: #11161f;
+}
+
+.editor-canvas-wrap {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.editor-canvas-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+}
+
+#editor-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+}
+
+.editor-side {
+  width: min(320px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(121, 135, 170, 0.12);
+  background: #11161f;
+}
+
+.editor-page-info {
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.editor-page-info span {
+  color: #7f8bb0;
+  font-family: "Orbitron", "IBM Plex Sans KR", sans-serif;
+  font-size: 0.78rem;
+}
+
+.editor-page-info strong {
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.editor-side-actions {
+  flex-direction: column;
+  margin-top: 18px;
+}
+
 @media (max-width: 720px) {
   .pdf-tool-page .page-shell {
     width: min(100% - 14px, 980px);
@@ -1229,5 +1379,15 @@ button {
 
   .pdf-tool-page .compact-card {
     padding: 16px;
+  }
+
+  .editor-main,
+  .editor-top-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .editor-side {
+    width: 100%;
   }
 }

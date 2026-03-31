@@ -1,17 +1,19 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import zipfile
 from typing import Iterable
 
 import fitz
+from PIL import Image, ImageDraw
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 
-app = FastAPI(title="HBS PDF Converter API", version="0.1.0")
+app = FastAPI(title="HBS PDF Converter API", version="0.3.0")
 
 
 def get_allowed_origins() -> list[str]:
@@ -34,7 +36,7 @@ app.add_middleware(
 def parse_page_range(range_text: str | None, total_pages: int) -> list[int]:
     text = (range_text or "").strip()
 
-    if not text or text == "전체":
+    if not text or text.lower() == "all" or text == "전체":
         return list(range(1, total_pages + 1))
 
     pages: set[int] = set()
@@ -85,6 +87,70 @@ def iter_selected_pages(document: fitz.Document, pages: Iterable[int]) -> Iterab
         yield page_number, document.load_page(page_number - 1)
 
 
+def parse_json_form(value: str | None, field_name: str) -> dict:
+    text = (value or "").strip()
+    if not text:
+        return {}
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"{field_name} 데이터 형식이 올바르지 않습니다.") from exc
+
+    if not isinstance(parsed, dict):
+        raise HTTPException(status_code=400, detail=f"{field_name} 데이터 형식이 올바르지 않습니다.")
+
+    return parsed
+
+
+def apply_page_edits(pixmap: fitz.Pixmap, edits: list[dict] | None, jpg_quality: float) -> bytes:
+    image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+
+    if edits:
+        draw = ImageDraw.Draw(image)
+        width, height = image.size
+
+        for edit in edits:
+            if edit.get("type") == "rect":
+                x1 = int(float(edit.get("x1", 0)) * width)
+                y1 = int(float(edit.get("y1", 0)) * height)
+                x2 = int(float(edit.get("x2", 0)) * width)
+                y2 = int(float(edit.get("y2", 0)) * height)
+                draw.rectangle([x1, y1, x2, y2], fill="white")
+                continue
+
+            if edit.get("type") == "freehand":
+                points = edit.get("points") or []
+                line_points = [
+                    (int(float(px) * width), int(float(py) * height))
+                    for px, py in points
+                ]
+                line_width = max(1, int(float(edit.get("width", 0.01)) * width))
+
+                if len(line_points) >= 2:
+                    draw.line(line_points, fill="white", width=line_width, joint="curve")
+
+                radius = max(1, line_width // 2)
+                for px, py in line_points:
+                    draw.ellipse([px - radius, py - radius, px + radius, py + radius], fill="white")
+
+    output = io.BytesIO()
+    image.save(output, format="JPEG", quality=int(min(max(jpg_quality, 0.5), 1.0) * 100))
+    return output.getvalue()
+
+
+@app.get("/")
+def index() -> JSONResponse:
+    return JSONResponse(
+        {
+            "service": "hbs-pdf-backend",
+            "status": "ok",
+            "health": "/health",
+            "convert": "/api/pdf/convert",
+        }
+    )
+
+
 @app.get("/health")
 def healthcheck() -> JSONResponse:
     return JSONResponse({"ok": True})
@@ -95,8 +161,12 @@ async def convert_pdf_to_jpg_zip(
     file: UploadFile = File(...),
     page_range: str = Form(""),
     jpg_quality: float = Form(0.9),
+    edits_json: str = Form(""),
+    rotations_json: str = Form(""),
 ) -> StreamingResponse:
-    if file.content_type not in {"application/pdf", "application/octet-stream"} and not file.filename.lower().endswith(".pdf"):
+    filename = file.filename or ""
+    is_pdf = file.content_type in {"application/pdf", "application/octet-stream"} or filename.lower().endswith(".pdf")
+    if not is_pdf:
         raise HTTPException(status_code=400, detail="PDF 파일만 업로드할 수 있습니다.")
 
     pdf_bytes = await file.read()
@@ -105,19 +175,27 @@ async def convert_pdf_to_jpg_zip(
 
     try:
         document = fitz.open(stream=pdf_bytes, filetype="pdf")
-    except Exception as exc:  # pragma: no cover - fitz raises several concrete types
-        raise HTTPException(status_code=400, detail="PDF 파일을 열지 못했습니다.") from exc
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=400, detail="PDF 파일을 읽지 못했습니다.") from exc
 
     try:
         pages_to_convert = parse_page_range(page_range, document.page_count)
-        matrix = quality_to_matrix(jpg_quality)
-        filename_root = os.path.splitext(file.filename)[0] or "converted"
+        base_matrix = quality_to_matrix(jpg_quality)
+        edits_by_page = parse_json_form(edits_json, "편집")
+        rotations_by_page = parse_json_form(rotations_json, "회전")
+        filename_root = os.path.splitext(filename)[0] or "converted"
         zip_buffer = io.BytesIO()
 
         with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
             for page_number, page in iter_selected_pages(document, pages_to_convert):
+                rotation = int(rotations_by_page.get(str(page_number), 0) or 0)
+                matrix = fitz.Matrix(base_matrix.a, base_matrix.d)
+                if rotation:
+                    matrix = matrix.prerotate(rotation)
+
                 pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-                jpg_bytes = pixmap.tobytes("jpg", jpg_quality=int(min(max(jpg_quality, 0.5), 1.0) * 100))
+                page_edits = edits_by_page.get(str(page_number), [])
+                jpg_bytes = apply_page_edits(pixmap, page_edits, jpg_quality)
                 archive.writestr(
                     f"{filename_root}-page-{page_number:02d}.jpg",
                     jpg_bytes,
