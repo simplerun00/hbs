@@ -6,48 +6,31 @@
   <title>PDF 이미지 변환기</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body>
-  <div class="ambient ambient-one"></div>
-  <div class="ambient ambient-two"></div>
-
-  <div class="page-shell detail-shell">
+<body class="pdf-tool-page">
+  <div class="page-shell detail-shell compact-shell">
     <a class="back-link" href="./index.html#tools">포털 사이트로 돌아가기</a>
 
-    <main class="detail-card pdf-tool-shell">
-      <section class="detail-header">
+    <main class="detail-card pdf-tool-shell compact-card">
+      <section class="detail-header compact-header">
         <div>
-          <p class="section-kicker">Backend Tool</p>
-          <h1 class="detail-title">PDF를 서버에서 JPG ZIP으로 변환</h1>
+          <p class="section-kicker">PDF Converter</p>
+          <h1 class="detail-title">PDF를 JPG ZIP으로 빠르게 변환</h1>
           <p class="detail-summary">
-            PDF 파일을 서버로 보내면 페이지별 JPG를 만들고 ZIP 파일로 묶어 돌려줍니다.
-            큰 파일도 브라우저가 직접 렌더링하지 않아 기존보다 더 안정적으로 처리할 수 있습니다.
+            PDF를 선택하고 바로 ZIP 생성만 누르면 됩니다. 무거운 미리보기 대신 서버에서 바로 변환해
+            다운로드하므로 브라우저 부담을 줄였습니다.
           </p>
         </div>
-        <span class="badge">서버 변환</span>
+        <span class="badge">빠른 변환</span>
       </section>
 
-      <section class="pdf-tool-grid">
-        <section class="detail-section">
-          <p class="section-kicker">1. 변환 설정</p>
-          <div class="tool-step-grid" aria-label="변환 단계">
-            <div class="tool-step active">
-              <strong>STEP 01</strong>
-              <span>PDF 선택</span>
-            </div>
-            <div class="tool-step">
-              <strong>STEP 02</strong>
-              <span>변환 옵션 확인</span>
-            </div>
-            <div class="tool-step">
-              <strong>STEP 03</strong>
-              <span>ZIP 생성</span>
-            </div>
-          </div>
+      <section class="pdf-tool-grid compact-grid">
+        <section class="detail-section compact-section">
+          <p class="section-kicker">변환 설정</p>
 
-          <label id="upload-panel" class="upload-panel" for="pdf-file">
+          <label id="upload-panel" class="upload-panel compact-upload" for="pdf-file">
             <input id="pdf-file" type="file" accept="application/pdf">
-            <strong>PDF 파일을 선택하세요</strong>
-            <span>클릭해서 고르거나 PDF 파일을 여기로 끌어다 놓으세요.</span>
+            <strong>PDF 파일 선택</strong>
+            <span>클릭하거나 파일을 끌어다 놓으세요.</span>
           </label>
 
           <div id="selected-file-card" class="selected-file-card" aria-live="polite">
@@ -55,7 +38,7 @@
             <strong id="selected-file-name">아직 선택되지 않음</strong>
           </div>
 
-          <div class="tool-controls">
+          <div class="tool-controls compact-controls">
             <label class="field">
               <span>페이지 범위</span>
               <input id="page-range" type="text" placeholder="비우면 전체, 예: 1-3,5">
@@ -67,20 +50,20 @@
             </label>
           </div>
 
-          <div class="detail-actions">
+          <div class="detail-actions compact-actions">
             <button id="render-button" class="button primary" type="button">ZIP 생성 시작</button>
             <button id="download-all-button" class="button secondary" type="button" disabled>마지막 ZIP 다시 받기</button>
           </div>
 
-          <p id="tool-status" class="detail-body">PDF를 선택하면 서버 변환을 시작합니다.</p>
+          <p id="tool-status" class="detail-body">PDF를 선택하면 서버 변환을 시작할 수 있습니다.</p>
         </section>
 
-        <aside class="detail-side">
+        <aside class="detail-side compact-side">
           <p class="section-kicker">사용 방법</p>
           <ul class="detail-list">
-            <li>PDF를 선택하고 필요하면 페이지 범위를 입력합니다.</li>
-            <li>`ZIP 생성 시작` 버튼을 누르면 서버가 JPG 묶음을 만들어 줍니다.</li>
-            <li>완료되면 ZIP 파일이 자동 다운로드되고 다시 받기 버튼도 활성화됩니다.</li>
+            <li>PDF를 선택합니다.</li>
+            <li>필요하면 페이지 범위와 품질을 조정합니다.</li>
+            <li>`ZIP 생성 시작`을 누르면 변환 후 자동 다운로드됩니다.</li>
           </ul>
 
           <p class="section-kicker">예시 입력</p>
@@ -88,8 +71,8 @@
         </aside>
       </section>
 
-      <section class="content-block preview-block">
-        <div class="section-head">
+      <section class="content-block preview-block compact-preview-block">
+        <div class="section-head compact-section-head">
           <div>
             <p class="section-kicker">Result</p>
             <h2>변환 결과</h2>

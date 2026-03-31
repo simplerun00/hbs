@@ -193,6 +193,16 @@ downloadAllButton.addEventListener("click", () => {
   }
 });
 
+pdfInput.addEventListener("click", () => {
+  setStatus("파일 선택 창을 여는 중입니다...");
+});
+
+if (uploadPanel) {
+  uploadPanel.addEventListener("pointerdown", () => {
+    setStatus("파일 선택 창을 여는 중입니다...");
+  });
+}
+
 pdfInput.addEventListener("change", () => {
   if (pdfInput.files && pdfInput.files[0]) {
     updateSelectedFile(pdfInput.files);
