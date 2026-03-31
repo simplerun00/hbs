@@ -1234,6 +1234,10 @@ button {
   overflow: hidden;
 }
 
+.editor-modal[hidden] {
+  display: none !important;
+}
+
 .editor-modal {
   position: fixed;
   inset: 0;

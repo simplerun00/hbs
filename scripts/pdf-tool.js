@@ -333,6 +333,10 @@ async function openEditor() {
 }
 
 function closeEditor() {
+  editorDrawing = false;
+  activePointerId = null;
+  editorPoints = [];
+  editorRectStart = null;
   editorModal.hidden = true;
   document.body.classList.remove("modal-open");
   clearEditorOverlay();
@@ -568,6 +572,18 @@ editorCloseButton.addEventListener("click", () => {
   closeEditor();
 });
 
+editorModal.addEventListener("click", (event) => {
+  if (event.target === editorModal) {
+    closeEditor();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !editorModal.hidden) {
+    closeEditor();
+  }
+});
+
 editorApplyButton.addEventListener("click", () => {
   closeEditor();
   setStatus("편집 내용을 저장했습니다. ZIP 생성 시작을 누르면 반영됩니다.");
@@ -669,6 +685,7 @@ updateSelectedFileLabel(null);
 updateQualityLabel();
 updateEditorSizeLabel();
 updateEditorToolButtons();
+closeEditor();
 setStatus(
   getConfiguredApiBaseUrl()
     ? "PDF를 선택하면 서버 변환을 시작할 수 있습니다."
