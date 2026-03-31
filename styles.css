@@ -1286,6 +1286,11 @@ button {
   margin-bottom: 18px;
 }
 
+.editor-top-controls {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
 .editor-title {
   margin: 0;
   font-size: 1.8rem;
@@ -1298,6 +1303,16 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.editor-zoom-group,
+.editor-rotate-group {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.editor-rotate-group {
+  margin-left: auto;
 }
 
 .editor-tool-button {

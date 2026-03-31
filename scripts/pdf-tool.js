@@ -3,7 +3,6 @@ const rangeInput = document.getElementById("page-range");
 const qualityInput = document.getElementById("jpg-quality");
 const renderButton = document.getElementById("render-button");
 const editorButton = document.getElementById("editor-button");
-const downloadAllButton = document.getElementById("download-all-button");
 const statusEl = document.getElementById("tool-status");
 const previewCountEl = document.getElementById("preview-count");
 const previewGrid = document.getElementById("preview-grid");
@@ -198,7 +197,6 @@ function clearResult() {
   lastResult = null;
   previewGrid.innerHTML = "";
   previewCountEl.textContent = "아직 생성된 ZIP 파일이 없습니다.";
-  downloadAllButton.disabled = true;
 }
 
 function triggerDownload(url, filename) {
@@ -217,7 +215,6 @@ function renderResultCard() {
   }
 
   previewCountEl.textContent = `${lastResult.pageCount}개 페이지가 서버에서 변환되었습니다.`;
-  downloadAllButton.disabled = false;
   previewGrid.innerHTML = `
     <article class="preview-card">
       <div class="preview-card-copy">
@@ -386,7 +383,7 @@ function applyZoomAnchor(anchor) {
 
 async function setEditorZoom(nextZoom, anchor = null) {
   const resolvedAnchor = anchor || getZoomAnchor(getViewportCenter().clientX, getViewportCenter().clientY);
-  editorZoom = Math.min(4, Math.max(0.5, nextZoom));
+  editorZoom = Math.min(4, Math.max(0.2, nextZoom));
   updateEditorZoomLabel();
   if (editorPages.length && currentPdfFile) {
     await renderEditorPage();
@@ -782,7 +779,7 @@ editorOverlay.addEventListener("pointercancel", () => {
   clearEditorOverlay();
 });
 
-editorOverlay.addEventListener("wheel", (event) => {
+editorCanvasShell.addEventListener("wheel", (event) => {
   if (editorModal.hidden) {
     return;
   }
@@ -990,12 +987,6 @@ editorToolButtons.forEach((button) => {
     editorTool = button.dataset.tool;
     updateEditorToolButtons();
   });
-});
-
-downloadAllButton.addEventListener("click", () => {
-  if (lastResult) {
-    triggerDownload(lastResult.url, lastResult.filename);
-  }
 });
 
 pdfInput.addEventListener("click", () => {
