@@ -46,7 +46,7 @@ let editorPages = [];
 let currentEditorIndex = 0;
 let editorEdits = {};
 let editorRotations = {};
-let editorTool = "freehand";
+let editorTool = "rect";
 let editorDrawing = false;
 let editorPoints = [];
 let editorRectStart = null;
@@ -390,6 +390,17 @@ function drawEditPreview(edit, context) {
   context.restore();
 }
 
+function drawLatestEditOnCanvas() {
+  const pageEdits = ensurePageEdits(getCurrentEditorPageNumber());
+  const latestEdit = pageEdits[pageEdits.length - 1];
+  if (!latestEdit) {
+    return;
+  }
+
+  const context = editorCanvas.getContext("2d", { alpha: false });
+  drawEditPreview(latestEdit, context);
+}
+
 async function renderEditorPage() {
   if (!editorPages.length || !currentPdfFile) {
     return;
@@ -642,7 +653,7 @@ editorOverlay.addEventListener("pointermove", (event) => {
   }
 });
 
-editorOverlay.addEventListener("pointerup", async (event) => {
+editorOverlay.addEventListener("pointerup", (event) => {
   if (editorPan && editorPanPointer === event.pointerId) {
     editorPanPointer = null;
     editorPanStart = null;
@@ -666,7 +677,9 @@ editorOverlay.addEventListener("pointerup", async (event) => {
 
   editorDrawing = false;
   activePointerId = null;
-  await renderEditorPage();
+  clearEditorOverlay();
+  drawLatestEditOnCanvas();
+  setEditorStatus(`현재 ${getCurrentEditorPageNumber()}페이지를 편집 중입니다.`);
 });
 
 editorOverlay.addEventListener("pointercancel", () => {

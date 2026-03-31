@@ -1371,6 +1371,7 @@ button {
   inset: 0;
   background: transparent;
   cursor: crosshair;
+  touch-action: none;
 }
 
 #editor-overlay.is-pan-mode {
