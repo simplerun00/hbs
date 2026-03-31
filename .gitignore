@@ -17,3 +17,9 @@ extracted/**/*.exe
 # Optional local exports
 *.log
 *.tmp
+
+# Local backend environment and test artifacts
+backend/.venv/
+backend/test-*.pdf
+backend/test-*.zip
+backend/test-*.txt

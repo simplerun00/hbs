@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #f5efe4;
   --surface: rgba(255, 250, 244, 0.8);
   --surface-strong: #fff9f0;
@@ -181,6 +181,67 @@ a:focus-visible {
 
 .hero-actions {
   margin-top: 24px;
+}
+
+.hero-featured {
+  margin-top: 28px;
+}
+
+.hero-featured-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.hero-featured-head h2 {
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  letter-spacing: -0.03em;
+}
+
+.hero-featured-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hero-tool-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.hero-tool-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 12px;
+}
+
+.hero-tool-title {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.hero-tool-summary {
+  margin: 0;
+}
+
+.hero-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-tool-actions .button {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 0.94rem;
 }
 
 .button {
@@ -472,6 +533,12 @@ a:focus-visible {
   cursor: pointer;
 }
 
+.upload-panel.drag-active {
+  border-color: var(--brand);
+  background: rgba(255, 247, 239, 0.92);
+  box-shadow: 0 18px 36px rgba(124, 49, 20, 0.12);
+}
+
 .upload-panel input {
   font: inherit;
 }
@@ -486,6 +553,10 @@ a:focus-visible {
 .field {
   display: grid;
   gap: 8px;
+}
+
+.field-full {
+  grid-column: 1 / -1;
 }
 
 .field span {
@@ -570,6 +641,10 @@ a:focus-visible {
   .hero-metrics {
     grid-template-columns: 1fr;
   }
+
+  .hero-featured-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {
@@ -601,3 +676,4 @@ a:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
