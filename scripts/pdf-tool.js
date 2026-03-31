@@ -619,7 +619,9 @@ function drawOverlayFreehand(points) {
   const overlayContext = editorOverlay.getContext("2d");
   clearEditorOverlay();
   overlayContext.save();
-  overlayContext.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  overlayContext.strokeStyle = "rgba(0, 231, 240, 0.95)";
+  overlayContext.shadowColor = "rgba(0, 231, 240, 0.35)";
+  overlayContext.shadowBlur = 8;
   overlayContext.lineCap = "round";
   overlayContext.lineJoin = "round";
   overlayContext.lineWidth = Number(editorSizeInput.value || "22");
@@ -640,8 +642,12 @@ function drawOverlayRect(start, end) {
   clearEditorOverlay();
   overlayContext.save();
   overlayContext.setLineDash([6, 4]);
-  overlayContext.strokeStyle = "rgba(255, 255, 255, 0.95)";
-  overlayContext.lineWidth = 2;
+  overlayContext.fillStyle = "rgba(0, 231, 240, 0.18)";
+  overlayContext.strokeStyle = "rgba(0, 231, 240, 0.98)";
+  overlayContext.shadowColor = "rgba(0, 231, 240, 0.32)";
+  overlayContext.shadowBlur = 10;
+  overlayContext.lineWidth = 3;
+  overlayContext.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
   overlayContext.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
   overlayContext.restore();
 }
