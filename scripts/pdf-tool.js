@@ -312,11 +312,33 @@ function updateEditorZoomLabel() {
   editorZoomValue.textContent = `${Math.round(editorZoom * 100)}%`;
 }
 
-function setEditorZoom(nextZoom) {
+function captureEditorViewport() {
+  const maxLeft = Math.max(1, editorCanvasShell.scrollWidth - editorCanvasShell.clientWidth);
+  const maxTop = Math.max(1, editorCanvasShell.scrollHeight - editorCanvasShell.clientHeight);
+  return {
+    leftRatio: editorCanvasShell.scrollLeft / maxLeft,
+    topRatio: editorCanvasShell.scrollTop / maxTop
+  };
+}
+
+function restoreEditorViewport(viewport) {
+  if (!viewport) {
+    return;
+  }
+
+  const maxLeft = Math.max(0, editorCanvasShell.scrollWidth - editorCanvasShell.clientWidth);
+  const maxTop = Math.max(0, editorCanvasShell.scrollHeight - editorCanvasShell.clientHeight);
+  editorCanvasShell.scrollLeft = viewport.leftRatio * maxLeft;
+  editorCanvasShell.scrollTop = viewport.topRatio * maxTop;
+}
+
+async function setEditorZoom(nextZoom) {
+  const viewport = captureEditorViewport();
   editorZoom = Math.min(4, Math.max(0.5, nextZoom));
   updateEditorZoomLabel();
   if (pdfDocument && editorPages.length) {
-    renderEditorPage();
+    await renderEditorPage();
+    restoreEditorViewport(viewport);
   }
 }
 
@@ -421,6 +443,7 @@ async function openEditor() {
     document.body.classList.add("modal-open");
     updateEditorZoomLabel();
     updateEditorToolButtons();
+    setEditorStatus("휠로 확대/축소, 드래그 이동으로 화면 탐색, Esc로 닫을 수 있습니다.");
     await renderEditorPage();
   } catch (error) {
     setStatus(error.message || "편집기를 열지 못했습니다.");
@@ -722,6 +745,39 @@ editorModal.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !editorModal.hidden) {
     closeEditor();
+    return;
+  }
+
+  if (editorModal.hidden) {
+    return;
+  }
+
+  if (event.key === "+" || event.key === "=") {
+    event.preventDefault();
+    setEditorZoom(editorZoom + 0.25);
+  } else if (event.key === "-") {
+    event.preventDefault();
+    setEditorZoom(editorZoom - 0.25);
+  } else if (event.key === "0") {
+    event.preventDefault();
+    setEditorZoom(1);
+  } else if (event.key.toLowerCase() === "m") {
+    event.preventDefault();
+    editorPan = !editorPan;
+    updateEditorToolButtons();
+    setEditorStatus(editorPan ? "드래그 이동 모드입니다. 화면을 끌어서 위치를 옮길 수 있습니다." : `현재 ${getCurrentEditorPageNumber()}페이지를 편집 중입니다.`);
+  } else if (event.key.toLowerCase() === "r") {
+    event.preventDefault();
+    editorPan = false;
+    editorTool = "rect";
+    updateEditorToolButtons();
+    setEditorStatus("사각 지우개 모드입니다.");
+  } else if (event.key.toLowerCase() === "h") {
+    event.preventDefault();
+    editorPan = false;
+    editorTool = "freehand";
+    updateEditorToolButtons();
+    setEditorStatus("자유 지우개 모드입니다.");
   }
 });
 
@@ -768,16 +824,16 @@ editorPanModeButton.addEventListener("click", () => {
   setEditorStatus(editorPan ? "드래그 이동 모드입니다. 화면을 끌어서 위치를 옮길 수 있습니다." : `현재 ${getCurrentEditorPageNumber()}페이지를 편집 중입니다.`);
 });
 
-editorZoomInButton.addEventListener("click", () => {
-  setEditorZoom(editorZoom + 0.25);
+editorZoomInButton.addEventListener("click", async () => {
+  await setEditorZoom(editorZoom + 0.25);
 });
 
-editorZoomOutButton.addEventListener("click", () => {
-  setEditorZoom(editorZoom - 0.25);
+editorZoomOutButton.addEventListener("click", async () => {
+  await setEditorZoom(editorZoom - 0.25);
 });
 
-editorZoomFitButton.addEventListener("click", () => {
-  setEditorZoom(1);
+editorZoomFitButton.addEventListener("click", async () => {
+  await setEditorZoom(1);
 });
 
 editorToolButtons.forEach((button) => {
