@@ -1355,14 +1355,10 @@ button {
 .editor-canvas-wrap {
   position: relative;
   width: fit-content;
-  max-width: 100%;
-  overflow: auto;
 }
 
 .editor-canvas-wrap canvas {
   display: block;
-  max-width: 100%;
-  height: auto;
   background: #fff;
 }
 

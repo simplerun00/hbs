@@ -310,6 +310,38 @@ function updateEditorZoomLabel() {
   editorZoomValue.textContent = `${Math.round(editorZoom * 100)}%`;
 }
 
+function getEditorNaturalCanvasSize() {
+  if (!editorCanvas.width || !editorCanvas.height) {
+    return null;
+  }
+
+  return {
+    width: editorCanvas.width / Math.max(editorZoom, 0.01),
+    height: editorCanvas.height / Math.max(editorZoom, 0.01)
+  };
+}
+
+function getFitZoomValue() {
+  const naturalSize = getEditorNaturalCanvasSize();
+  if (!naturalSize) {
+    return 1;
+  }
+
+  const shellStyles = window.getComputedStyle(editorCanvasShell);
+  const horizontalPadding = Number.parseFloat(shellStyles.paddingLeft || "0") + Number.parseFloat(shellStyles.paddingRight || "0");
+  const verticalPadding = Number.parseFloat(shellStyles.paddingTop || "0") + Number.parseFloat(shellStyles.paddingBottom || "0");
+  const availableWidth = Math.max(120, editorCanvasShell.clientWidth - horizontalPadding);
+  const availableHeight = Math.max(120, editorCanvasShell.clientHeight - verticalPadding);
+
+  return Math.min(
+    4,
+    Math.max(
+      0.2,
+      Math.min(availableWidth / naturalSize.width, availableHeight / naturalSize.height)
+    )
+  );
+}
+
 function captureEditorViewport() {
   const maxLeft = Math.max(1, editorCanvasShell.scrollWidth - editorCanvasShell.clientWidth);
   const maxTop = Math.max(1, editorCanvasShell.scrollHeight - editorCanvasShell.clientHeight);
@@ -334,7 +366,7 @@ async function setEditorZoom(nextZoom) {
   const viewport = captureEditorViewport();
   editorZoom = Math.min(4, Math.max(0.5, nextZoom));
   updateEditorZoomLabel();
-  if (pdfDocument && editorPages.length) {
+  if (editorPages.length && currentPdfFile) {
     await renderEditorPage();
     restoreEditorViewport(viewport);
   }
@@ -401,6 +433,25 @@ function drawLatestEditOnCanvas() {
   drawEditPreview(latestEdit, context);
 }
 
+function syncCanvasDisplaySize(width, height) {
+  const widthPx = `${width}px`;
+  const heightPx = `${height}px`;
+  editorCanvas.style.width = widthPx;
+  editorCanvas.style.height = heightPx;
+  editorOverlay.style.width = widthPx;
+  editorOverlay.style.height = heightPx;
+}
+
+async function fitEditorToViewport() {
+  editorZoom = getFitZoomValue();
+  updateEditorZoomLabel();
+  if (editorPages.length && currentPdfFile) {
+    await renderEditorPage();
+    editorCanvasShell.scrollLeft = 0;
+    editorCanvasShell.scrollTop = 0;
+  }
+}
+
 async function renderEditorPage() {
   if (!editorPages.length || !currentPdfFile) {
     return;
@@ -450,6 +501,7 @@ async function renderEditorPage() {
   editorCanvas.height = height;
   editorOverlay.width = width;
   editorOverlay.height = height;
+  syncCanvasDisplaySize(width, height);
 
   context.clearRect(0, 0, width, height);
   context.drawImage(preview.image, 0, 0, width, height);
@@ -500,6 +552,7 @@ async function openEditor() {
     updateEditorToolButtons();
     setEditorStatus("휠로 확대/축소, 드래그 이동으로 화면 탐색, Esc로 닫을 수 있습니다.");
     await renderEditorPage();
+    await fitEditorToViewport();
   } catch (error) {
     setStatus(error.message || "편집기를 열지 못했습니다.");
   }
@@ -608,6 +661,9 @@ editorOverlay.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  event.preventDefault();
+  editorOverlay.setPointerCapture?.(event.pointerId);
+
   if (editorPan) {
     editorPanPointer = event.pointerId;
     editorPanStart = { x: event.clientX, y: event.clientY };
@@ -633,6 +689,7 @@ editorOverlay.addEventListener("pointerdown", (event) => {
 
 editorOverlay.addEventListener("pointermove", (event) => {
   if (editorPan && editorPanPointer === event.pointerId && editorPanStart && editorPanScrollStart) {
+    event.preventDefault();
     const dx = event.clientX - editorPanStart.x;
     const dy = event.clientY - editorPanStart.y;
     editorCanvasShell.scrollLeft = editorPanScrollStart.left - dx;
@@ -654,6 +711,8 @@ editorOverlay.addEventListener("pointermove", (event) => {
 });
 
 editorOverlay.addEventListener("pointerup", (event) => {
+  editorOverlay.releasePointerCapture?.(event.pointerId);
+
   if (editorPan && editorPanPointer === event.pointerId) {
     editorPanPointer = null;
     editorPanStart = null;
@@ -890,7 +949,7 @@ editorZoomOutButton.addEventListener("click", async () => {
 });
 
 editorZoomFitButton.addEventListener("click", async () => {
-  await setEditorZoom(1);
+  await fitEditorToViewport();
 });
 
 editorToolButtons.forEach((button) => {
