@@ -342,33 +342,57 @@ function getFitZoomValue() {
   );
 }
 
-function captureEditorViewport() {
-  const maxLeft = Math.max(1, editorCanvasShell.scrollWidth - editorCanvasShell.clientWidth);
-  const maxTop = Math.max(1, editorCanvasShell.scrollHeight - editorCanvasShell.clientHeight);
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getViewportCenter() {
+  const shellRect = editorCanvasShell.getBoundingClientRect();
   return {
-    leftRatio: editorCanvasShell.scrollLeft / maxLeft,
-    topRatio: editorCanvasShell.scrollTop / maxTop
+    clientX: shellRect.left + shellRect.width / 2,
+    clientY: shellRect.top + shellRect.height / 2
   };
 }
 
-function restoreEditorViewport(viewport) {
-  if (!viewport) {
+function getZoomAnchor(clientX, clientY) {
+  const shellRect = editorCanvasShell.getBoundingClientRect();
+  const canvasRect = editorCanvas.getBoundingClientRect();
+  const canvasWidth = Math.max(1, editorCanvas.clientWidth || editorCanvas.width);
+  const canvasHeight = Math.max(1, editorCanvas.clientHeight || editorCanvas.height);
+
+  return {
+    normalizedX: clamp((clientX - canvasRect.left) / canvasWidth, 0, 1),
+    normalizedY: clamp((clientY - canvasRect.top) / canvasHeight, 0, 1),
+    viewportX: clamp(clientX - shellRect.left, 0, shellRect.width),
+    viewportY: clamp(clientY - shellRect.top, 0, shellRect.height)
+  };
+}
+
+function applyZoomAnchor(anchor) {
+  if (!anchor) {
     return;
   }
 
+  const displayWidth = Math.max(1, editorCanvas.clientWidth || editorCanvas.width);
+  const displayHeight = Math.max(1, editorCanvas.clientHeight || editorCanvas.height);
   const maxLeft = Math.max(0, editorCanvasShell.scrollWidth - editorCanvasShell.clientWidth);
   const maxTop = Math.max(0, editorCanvasShell.scrollHeight - editorCanvasShell.clientHeight);
-  editorCanvasShell.scrollLeft = viewport.leftRatio * maxLeft;
-  editorCanvasShell.scrollTop = viewport.topRatio * maxTop;
+  const targetLeft = editorCanvas.offsetLeft + anchor.normalizedX * displayWidth - anchor.viewportX;
+  const targetTop = editorCanvas.offsetTop + anchor.normalizedY * displayHeight - anchor.viewportY;
+
+  editorCanvasShell.scrollLeft = clamp(targetLeft, 0, maxLeft);
+  editorCanvasShell.scrollTop = clamp(targetTop, 0, maxTop);
 }
 
-async function setEditorZoom(nextZoom) {
-  const viewport = captureEditorViewport();
+async function setEditorZoom(nextZoom, anchor = null) {
+  const resolvedAnchor = anchor || getZoomAnchor(getViewportCenter().clientX, getViewportCenter().clientY);
   editorZoom = Math.min(4, Math.max(0.5, nextZoom));
   updateEditorZoomLabel();
   if (editorPages.length && currentPdfFile) {
     await renderEditorPage();
-    restoreEditorViewport(viewport);
+    window.requestAnimationFrame(() => {
+      applyZoomAnchor(resolvedAnchor);
+    });
   }
 }
 
@@ -758,8 +782,9 @@ editorOverlay.addEventListener("wheel", (event) => {
   }
 
   event.preventDefault();
+  const anchor = getZoomAnchor(event.clientX, event.clientY);
   const delta = event.deltaY < 0 ? 0.1 : -0.1;
-  setEditorZoom(editorZoom + delta);
+  setEditorZoom(editorZoom + delta, anchor);
 }, { passive: false });
 
 async function requestServerConversion() {
@@ -941,11 +966,13 @@ editorPanModeButton.addEventListener("click", () => {
 });
 
 editorZoomInButton.addEventListener("click", async () => {
-  await setEditorZoom(editorZoom + 0.25);
+  const center = getViewportCenter();
+  await setEditorZoom(editorZoom + 0.25, getZoomAnchor(center.clientX, center.clientY));
 });
 
 editorZoomOutButton.addEventListener("click", async () => {
-  await setEditorZoom(editorZoom - 0.25);
+  const center = getViewportCenter();
+  await setEditorZoom(editorZoom - 0.25, getZoomAnchor(center.clientX, center.clientY));
 });
 
 editorZoomFitButton.addEventListener("click", async () => {
