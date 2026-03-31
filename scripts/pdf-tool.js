@@ -57,10 +57,7 @@ let editorPan = false;
 let editorPanPointer = null;
 let editorPanStart = null;
 let editorPanScrollStart = null;
-
-if (window.pdfjsLib) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "./scripts/vendor/pdfjs/pdf.worker.min.js";
-}
+let editorPreviewCache = {};
 
 function setStatus(message) {
   statusEl.textContent = message;
@@ -245,6 +242,7 @@ function resetEditorState() {
   currentEditorIndex = 0;
   editorZoom = 1;
   editorPan = false;
+  editorPreviewCache = {};
 }
 
 function updateSelectedFile(fileList) {
@@ -393,22 +391,57 @@ function drawEditPreview(edit, context) {
 }
 
 async function renderEditorPage() {
-  if (!pdfDocument || !editorPages.length) {
+  if (!editorPages.length || !currentPdfFile) {
     return;
   }
 
   const pageNumber = getCurrentEditorPageNumber();
-  const page = await pdfDocument.getPage(pageNumber);
   const rotation = getCurrentRotation();
-  const viewport = page.getViewport({ scale: editorBaseScale * editorZoom, rotation });
   const context = editorCanvas.getContext("2d", { alpha: false });
+  const cacheKey = `${pageNumber}:${rotation}`;
+  let preview = editorPreviewCache[cacheKey];
 
-  editorCanvas.width = viewport.width;
-  editorCanvas.height = viewport.height;
-  editorOverlay.width = viewport.width;
-  editorOverlay.height = viewport.height;
+  if (!preview) {
+    setEditorStatus(`${pageNumber}페이지 미리보기를 불러오는 중입니다...`);
 
-  await page.render({ canvasContext: context, viewport }).promise;
+    const apiBaseUrl = await resolveApiBaseUrl();
+    if (!apiBaseUrl) {
+      throw new Error("미리보기 서버에 연결하지 못했습니다.");
+    }
+
+    const formData = new FormData();
+    formData.append("file", currentPdfFile);
+    formData.append("page_number", String(pageNumber));
+    formData.append("jpg_quality", qualityInput.value || "0.9");
+    formData.append("rotation", String(rotation));
+
+    const response = await fetch(`${apiBaseUrl}/api/pdf/preview-page`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error("편집용 미리보기를 불러오지 못했습니다.");
+    }
+
+    const blob = await response.blob();
+    const imageUrl = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = imageUrl;
+    await image.decode();
+    preview = { image, imageUrl };
+    editorPreviewCache[cacheKey] = preview;
+  }
+
+  const width = Math.max(1, Math.round(preview.image.naturalWidth * editorZoom));
+  const height = Math.max(1, Math.round(preview.image.naturalHeight * editorZoom));
+  editorCanvas.width = width;
+  editorCanvas.height = height;
+  editorOverlay.width = width;
+  editorOverlay.height = height;
+
+  context.clearRect(0, 0, width, height);
+  context.drawImage(preview.image, 0, 0, width, height);
   ensurePageEdits(pageNumber).forEach((edit) => drawEditPreview(edit, context));
 
   clearEditorOverlay();
@@ -425,16 +458,27 @@ async function openEditor() {
     return;
   }
 
-  if (!window.pdfjsLib) {
-    setStatus("편집기에 필요한 라이브러리를 불러오지 못했습니다.");
-    return;
-  }
-
   try {
-    const pdfBytes = await currentPdfFile.arrayBuffer();
-    const loadingTask = window.pdfjsLib.getDocument({ data: pdfBytes });
-    pdfDocument = await loadingTask.promise;
-    editorPages = parsePageRange(rangeInput.value, pdfDocument.numPages);
+    const apiBaseUrl = await resolveApiBaseUrl();
+    if (!apiBaseUrl) {
+      setStatus("편집기를 열기 전에 변환 서버에 연결해야 합니다.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", currentPdfFile);
+
+    const inspectResponse = await fetch(`${apiBaseUrl}/api/pdf/inspect`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!inspectResponse.ok) {
+      throw new Error("PDF 페이지 정보를 불러오지 못했습니다.");
+    }
+
+    const inspectData = await inspectResponse.json();
+    editorPages = parsePageRange(rangeInput.value, inspectData.page_count);
     currentEditorIndex = 0;
     editorZoom = 1;
     editorPan = false;

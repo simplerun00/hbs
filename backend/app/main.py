@@ -11,7 +11,7 @@ import fitz
 from PIL import Image, ImageDraw
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 
 app = FastAPI(title="HBS PDF Converter API", version="0.3.0")
@@ -145,6 +145,18 @@ def apply_page_edits(pixmap: fitz.Pixmap, edits: list[dict] | None, jpg_quality:
     return output.getvalue()
 
 
+def render_page_preview(page: fitz.Page, jpg_quality: float, rotation: int = 0) -> bytes:
+    matrix = quality_to_matrix(jpg_quality)
+    if rotation:
+        matrix = fitz.Matrix(matrix.a, matrix.d).prerotate(rotation)
+
+    pixmap = page.get_pixmap(matrix=matrix, alpha=False)
+    image = Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+    output = io.BytesIO()
+    image.save(output, format="JPEG", quality=int(min(max(jpg_quality, 0.5), 1.0) * 100))
+    return output.getvalue()
+
+
 @app.get("/")
 def index() -> JSONResponse:
     return JSONResponse(
@@ -160,6 +172,68 @@ def index() -> JSONResponse:
 @app.get("/health")
 def healthcheck() -> JSONResponse:
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/pdf/inspect")
+async def inspect_pdf(
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    filename = file.filename or ""
+    is_pdf = file.content_type in {"application/pdf", "application/octet-stream"} or filename.lower().endswith(".pdf")
+    if not is_pdf:
+        raise HTTPException(status_code=400, detail="PDF 파일만 업로드할 수 있습니다.")
+
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+
+    try:
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=400, detail="PDF 파일을 읽지 못했습니다.") from exc
+
+    try:
+        return JSONResponse(
+            {
+                "ok": True,
+                "filename": filename,
+                "page_count": document.page_count,
+            }
+        )
+    finally:
+        document.close()
+
+
+@app.post("/api/pdf/preview-page")
+async def preview_pdf_page(
+    file: UploadFile = File(...),
+    page_number: int = Form(...),
+    jpg_quality: float = Form(0.9),
+    rotation: int = Form(0),
+) -> Response:
+    filename = file.filename or ""
+    is_pdf = file.content_type in {"application/pdf", "application/octet-stream"} or filename.lower().endswith(".pdf")
+    if not is_pdf:
+        raise HTTPException(status_code=400, detail="PDF 파일만 업로드할 수 있습니다.")
+
+    pdf_bytes = await file.read()
+    if not pdf_bytes:
+        raise HTTPException(status_code=400, detail="비어 있는 파일입니다.")
+
+    try:
+        document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(status_code=400, detail="PDF 파일을 읽지 못했습니다.") from exc
+
+    try:
+        if page_number < 1 or page_number > document.page_count:
+            raise HTTPException(status_code=400, detail="미리보기 페이지 번호가 올바르지 않습니다.")
+
+        page = document.load_page(page_number - 1)
+        preview_bytes = render_page_preview(page, jpg_quality, rotation)
+        return Response(content=preview_bytes, media_type="image/jpeg")
+    finally:
+        document.close()
 
 
 @app.post("/api/pdf/convert")
