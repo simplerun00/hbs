@@ -549,6 +549,26 @@ button {
   font-size: 1.9rem;
 }
 
+.capability-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin-top: 18px;
+  padding: 0 16px;
+  border: 1px solid rgba(0, 231, 240, 0.18);
+  color: var(--teal);
+  background: rgba(0, 231, 240, 0.08);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.capability-link:hover,
+.capability-link:focus-visible {
+  border-color: rgba(0, 231, 240, 0.36);
+  background: rgba(0, 231, 240, 0.14);
+}
+
 .signal-row {
   display: flex;
   gap: 6px;
