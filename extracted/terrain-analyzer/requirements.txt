@@ -1,0 +1,6 @@
+numpy
+pyshp
+scipy
+matplotlib
+ezdxf
+pyproj

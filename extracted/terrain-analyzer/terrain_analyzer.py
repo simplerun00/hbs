@@ -8,7 +8,22 @@
 
 import os, sys, json, shutil, subprocess, traceback, datetime, tempfile
 
-LOG_FILE = os.path.join(os.path.expanduser("~"), "Desktop", "분석기_오류로그.txt")
+
+def _get_default_app_home():
+    configured = os.getenv("TERRAIN_ANALYZER_HOME", "").strip()
+    if configured:
+        return configured
+    return os.path.join(os.path.expanduser("~"), "Documents", "terrain-analyzer")
+
+
+def _ensure_dir(path):
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+APP_HOME = _ensure_dir(_get_default_app_home())
+DEFAULT_OUTPUT_DIR = _ensure_dir(os.path.join(APP_HOME, "분석결과"))
+LOG_FILE = os.path.join(APP_HOME, "분석기_오류로그.txt")
 
 def write_crash_log(msg):
     try:
@@ -1591,7 +1606,7 @@ class App:
                 with open(os.path.join(od, ".t"), 'w') as f: f.write("t")
                 os.remove(os.path.join(od, ".t"))
             except Exception:
-                od = os.path.join(os.path.expanduser("~"), "Desktop", "분석결과")
+                od = DEFAULT_OUTPUT_DIR
                 os.makedirs(od, exist_ok=True)
 
         self.progress_file = os.path.join(tempfile.gettempdir(), "terrain_progress.json")
