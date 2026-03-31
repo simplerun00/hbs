@@ -1369,6 +1369,7 @@ button {
 #editor-overlay {
   position: absolute;
   inset: 0;
+  background: transparent;
   cursor: crosshair;
 }
 
