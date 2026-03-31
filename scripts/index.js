@@ -1,7 +1,8 @@
-const apps = window.APP_DATA || [];
+﻿const apps = window.APP_DATA || [];
 const appGrid = document.getElementById("app-grid");
 const countEl = document.getElementById("tool-count");
 const featuredToolsEl = document.getElementById("hero-featured-tools");
+const statusDot = document.querySelector(".status-dot");
 
 function getPrimaryLink(app) {
   return app.webPath ? app.webPath : `./app.html?id=${app.id}`;
@@ -31,11 +32,11 @@ function getSecondaryLabel(app) {
   return app.packagePath ? "패키지 열기" : "도구 설명";
 }
 
-if (countEl) {
-  countEl.textContent = `${apps.length}개`;
-}
+function renderFeaturedTools() {
+  if (!featuredToolsEl) {
+    return;
+  }
 
-if (featuredToolsEl) {
   featuredToolsEl.innerHTML = apps.slice(0, 2).map((app) => `
     <article class="hero-tool-card">
       <div class="hero-tool-top">
@@ -47,14 +48,18 @@ if (featuredToolsEl) {
       </div>
       <p class="hero-tool-summary">${app.summary}</p>
       <div class="hero-tool-actions">
-        <a class="button primary" href="${getPrimaryLink(app)}">${getPrimaryLabel(app)}</a>
-        <a class="button secondary" href="${getSecondaryLink(app)}">${getSecondaryLabel(app)}</a>
+        <a class="primary-button" href="${getPrimaryLink(app)}">${getPrimaryLabel(app)}</a>
+        <a class="secondary-button" href="${getSecondaryLink(app)}">${getSecondaryLabel(app)}</a>
       </div>
     </article>
   `).join("");
 }
 
-if (appGrid) {
+function renderAppGrid() {
+  if (!appGrid) {
+    return;
+  }
+
   appGrid.innerHTML = apps.map((app) => `
     <article class="app-card">
       <div class="app-top">
@@ -67,16 +72,29 @@ if (appGrid) {
       </div>
 
       <div class="meta-row">
-        <span><strong class="meta-label">버전</strong>${app.version}</span>
-        <span><strong class="meta-label">업데이트</strong>${app.updatedAt}</span>
+        <span><strong class="meta-label">버전</strong> ${app.version}</span>
+        <span><strong class="meta-label">업데이트</strong> ${app.updatedAt}</span>
       </div>
 
       <p class="status-note">${app.nextStep}</p>
 
       <div class="app-actions">
-        <a class="button primary" href="${getPrimaryLink(app)}">${getPrimaryLabel(app)}</a>
-        <a class="button secondary" href="${getSecondaryLink(app)}">${getSecondaryLabel(app)}</a>
+        <a class="primary-button" href="${getPrimaryLink(app)}">${getPrimaryLabel(app)}</a>
+        <a class="secondary-button" href="${getSecondaryLink(app)}">${getSecondaryLabel(app)}</a>
       </div>
     </article>
   `).join("");
+}
+
+if (countEl) {
+  countEl.textContent = `${apps.length}개`;
+}
+
+renderFeaturedTools();
+renderAppGrid();
+
+if (statusDot) {
+  window.setInterval(() => {
+    statusDot.classList.toggle("status-dot-idle");
+  }, 1100);
 }
