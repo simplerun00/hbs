@@ -59,7 +59,7 @@ let editorPanStart = null;
 let editorPanScrollStart = null;
 
 if (window.pdfjsLib) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf.worker.min.js";
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = "./scripts/vendor/pdfjs/pdf.worker.min.js";
 }
 
 function setStatus(message) {
