@@ -14,7 +14,7 @@ function getPrimaryLabel(app) {
 
 function getSecondaryLink(app) {
   if (app.webPath) {
-    return `./app.html?id=${app.id}`;
+    return app.webPath;
   }
 
   if (app.packagePath) {
@@ -26,7 +26,7 @@ function getSecondaryLink(app) {
 
 function getSecondaryLabel(app) {
   if (app.webPath) {
-    return "도구 설명";
+    return "페이지 열기";
   }
 
   return app.packagePath ? "패키지 열기" : "도구 설명";
@@ -38,7 +38,7 @@ function renderFeaturedTools() {
   }
 
   featuredToolsEl.innerHTML = apps.slice(0, 2).map((app) => `
-    <article class="hero-tool-card">
+    <article class="hero-tool-card${app.webPath ? " clickable-card" : ""}"${app.webPath ? ` data-href="${app.webPath}"` : ""}>
       <div class="hero-tool-top">
         <div>
           <p class="section-kicker">${app.category}</p>
@@ -61,7 +61,7 @@ function renderAppGrid() {
   }
 
   appGrid.innerHTML = apps.map((app) => `
-    <article class="app-card">
+    <article class="app-card${app.webPath ? " clickable-card" : ""}"${app.webPath ? ` data-href="${app.webPath}"` : ""}>
       <div class="app-top">
         <div>
           <p class="section-kicker">${app.category}</p>
@@ -86,12 +86,28 @@ function renderAppGrid() {
   `).join("");
 }
 
+function enableCardNavigation() {
+  document.querySelectorAll(".clickable-card[data-href]").forEach((card) => {
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("a, button")) {
+        return;
+      }
+
+      const href = card.getAttribute("data-href");
+      if (href) {
+        window.location.href = href;
+      }
+    });
+  });
+}
+
 if (countEl) {
   countEl.textContent = `${apps.length}개`;
 }
 
 renderFeaturedTools();
 renderAppGrid();
+enableCardNavigation();
 
 if (statusDot) {
   window.setInterval(() => {
